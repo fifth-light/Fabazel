@@ -1,0 +1,73 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("//rule:extract_jar.bzl", "extract_jar")
+load("//rule:merge_mapping.bzl", "merge_mapping", "merge_mapping_input")
+load("//rule:remap_jar.bzl", "remap_jar")
+
+extract_jar(
+    name = "intermediary_mapping",
+    entry_path = "mappings/mappings.tiny",
+    filename = "intermediary.tiny",
+    input = "@maven//:net_fabricmc_intermediary_v2",
+)
+
+extract_jar(
+    name = "yarn_mapping",
+    entry_path = "mappings/mappings.tiny",
+    filename = "yarn.tiny",
+    input = "@maven//:net_fabricmc_yarn_v2_1_21_4_build_8",
+)
+
+merge_mapping_input(
+    name = "yarn_input",
+    file = ":yarn_mapping",
+    format = "tinyv2",
+)
+
+merge_mapping_input(
+    name = "intermediary_input",
+    file = ":intermediary_mapping",
+    format = "tinyv2",
+    source_namespace = "intermediary",
+)
+
+merge_mapping(
+    name = "merged_mapping",
+    complete_namespace = {
+        "named": "official",
+        "intermediary": "official",
+    },
+    inputs = [
+        ":yarn_input",
+        ":intermediary_input",
+    ],
+    output = "merged.tiny",
+    output_source_namespace = "official",
+)
+
+remap_jar(
+    name = "remapped_client",
+    from_namespace = "official",
+    input = "@minecraft//:1.21.4_client",
+    mapping = ":merged_mapping",
+    to_namespace = "named",
+)
+
+kt_jvm_library(
+    name = "mod_unmapped",
+    srcs = glob(["kotlin/**/*.kt"]),
+    resources = glob(["resources/**"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":remapped_client",
+        "@maven//:net_fabricmc_fabric_loader",
+    ],
+)
+
+remap_jar(
+    name = "mod",
+    from_namespace = "named",
+    input = ":mod_unmapped",
+    mapping = ":merged_mapping",
+    mixin = True,
+    to_namespace = "intermediary",
+)

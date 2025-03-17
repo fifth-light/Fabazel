@@ -1,0 +1,47 @@
+"Fabazel module file"
+
+module(
+    name = "fabazel",
+    version = "0.0.1",
+)
+
+bazel_dep(name = "rules_java", version = "8.6.1")
+bazel_dep(name = "rules_kotlin", version = "2.1.0")
+bazel_dep(name = "rules_jvm_external", version = "6.7")
+
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    artifacts = [
+        "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0",
+        "org.jetbrains:annotations:26.0.2",
+    ],
+    repositories = [
+        "https://repo1.maven.org/maven2",
+    ],
+    lock_file = "//:maven_install.json",
+)
+maven.install(
+    artifacts = [
+        "net.fabricmc:fabric-loader:0.16.10",
+        "net.fabricmc:intermediary:1.21.4:v2",
+        "net.fabricmc:yarn:1.21.4+build.8:v2",
+        "net.fabricmc:tiny-remapper:0.11.0",
+        "net.fabricmc:mapping-io:0.7.1",
+    ],
+    repositories = [
+        "https://repo1.maven.org/maven2",
+        "https://maven.fabricmc.net/",
+    ],
+    lock_file = "//:maven_install.json",
+)
+use_repo(maven, "maven")
+
+minecraft = use_extension("//repo:minecraft_jar.bzl", "minecraft")
+
+minecraft.minecraft_jar(
+    version = "1.21.4",
+    type = "client",
+    mapping = False,
+)
+
+use_repo(minecraft, "minecraft")

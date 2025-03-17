@@ -1,0 +1,14 @@
+{
+    "schemaVersion": 1,
+    "id": "fabazel",
+    "version": "0.0.1",
+    "name": "Fabazel",
+    "entrypoints": {
+        "client": [
+            "top.fifthlight.fabazel.Fabazel"
+        ]
+    },
+    "depends": {
+        "fabricloader": ">=0.16.10"
+    }
+}
