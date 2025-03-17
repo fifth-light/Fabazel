@@ -1366,7 +1366,7 @@
     ]
   },
   "repositories": {
-    "https://repo1.maven.org/maven2/": [
+    "https://maven.fabricmc.net/": [
       "biz.aQute.bnd:biz.aQute.bnd.util",
       "biz.aQute.bnd:biz.aQute.bndlib",
       "com.google.auto.value:auto-value-annotations",
@@ -1432,7 +1432,7 @@
       "org.ow2.asm:asm-util",
       "org.slf4j:slf4j-api"
     ],
-    "https://maven.fabricmc.net/": [
+    "https://repo1.maven.org/maven2/": [
       "biz.aQute.bnd:biz.aQute.bnd.util",
       "biz.aQute.bnd:biz.aQute.bndlib",
       "com.google.auto.value:auto-value-annotations",

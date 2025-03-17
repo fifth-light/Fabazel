@@ -18,18 +18,32 @@ minecraft_jar = tag_class(
     },
 )
 
-def _minecrat_repo_impl(rctx):
-    entries = rctx.attr.entries
+def _minecraft_repo_impl(rctx):
+    version_repo_names = rctx.attr.version_repo_names
+    version_libraries = rctx.attr.version_libraries
 
-    content = ["""package(default_visibility = ["//visibility:public"])"""]
+    content = ['package(default_visibility = ["//visibility:public"])', ""]
 
-    for entry in entries:
-        file_type = "file" if entry.endswith("mapping") else "jar"
-        content.append("""
-alias(
-    name = "{repo}",
-    actual = "@minecraft_{repo}//{file_type}",
-)""".format(repo = entry, file_type = file_type))
+    for version_repo in version_repo_names:
+        actual_repo = "@minecraft_%s//file" % version_repo
+        if version_repo.endswith("mapping"):
+            content.append("alias(")
+            content.append('    name = "%s",' % version_repo)
+            content.append('    actual = "%s",' % actual_repo)
+            content.append(")")
+        else:
+            content.append("java_import(")
+            content.append('    name = "%s",' % version_repo)
+            content.append('    jars = ["%s"],' % actual_repo)
+            content.append('    deps = ["%s_libraries"]' % version_repo)
+            content.append(")")
+            content.append("java_import(")
+            content.append('    name = "%s_libraries",' % version_repo)
+            content.append("    jars = [")
+            content.append("        %s" % version_libraries[version_repo])
+            content.append("    ],")
+            content.append(")")
+        content.append("")
 
     rctx.file(
         "BUILD.bazel",
@@ -37,8 +51,11 @@ alias(
     )
 
 minecraft_registry = repository_rule(
-    implementation = _minecrat_repo_impl,
-    attrs = {"entries": attr.string_list()},
+    implementation = _minecraft_repo_impl,
+    attrs = {
+        "version_repo_names": attr.string_list(),
+        "version_libraries": attr.string_dict(),
+    },
 )
 
 def _minecraft_impl(mctx):
@@ -52,25 +69,30 @@ def _minecraft_impl(mctx):
     )
     manifest = json.decode(mctx.read(manifest_path))
 
-    version_entries = []
-
     # Deduplicate version entries
+    version_entries = {}
     for mod in mctx.modules:
         for minecraft_jar in mod.tags.minecraft_jar:
-            version_entry = {
-                "version": minecraft_jar.version,
-                "type": minecraft_jar.type,
-                "mapping": minecraft_jar.mapping,
-            }
-            found = False
-            for entry in version_entries:
-                if entry["version"] == version_entry["version"] and entry["type"] == version_entry["type"]:
-                    entry["mapping"] = entry["mapping"] or version_entry["mapping"]
-                    found = True
-            if not found:
-                version_entries.append(version_entry)
+            key = (minecraft_jar.version, minecraft_jar.type)
+            if key in version_entries:
+                version_entries[key]["mapping"] |= minecraft_jar.mapping
+            else:
+                version_entries[key] = {
+                    "version": minecraft_jar.version,
+                    "type": minecraft_jar.type,
+                    "mapping": minecraft_jar.mapping,
+                }
+    version_entries = version_entries.values()
 
-    repo_names = []
+    version_repo_names = []
+    version_libraries = {}
+    library_entries = {}
+
+    def escape_library_name(name):
+        return name.replace(".", "_").replace(":", "_")
+
+    def get_library_repo_name(name):
+        return "minecraft_%s" % escape_library_name(name)
 
     for version_entry in version_entries:
         target_version = version_entry["version"]
@@ -92,6 +114,7 @@ def _minecraft_impl(mctx):
         mctx.download(
             url = version_entry["url"],
             output = version_json_path,
+            integrity = hex_sha1_to_sri(version_entry["sha1"]),
         )
         version_data = json.decode(mctx.read(version_json_path))
 
@@ -100,36 +123,69 @@ def _minecraft_impl(mctx):
         if not jar_info:
             fail("Type '%s' not found in version %s's data" % (target_type, target_version))
 
-        # Create JAR repository
+        # Create repository for JAR
         repo_name = "%s_%s" % (target_version, target_type)
-        http_jar(
+        http_file(
             name = "minecraft_%s" % repo_name,
             url = jar_info["url"],
             integrity = hex_sha1_to_sri(jar_info["sha1"]),
-            downloaded_file_name = "%s.jar" % target_type,
+            downloaded_file_path = "%s.jar" % target_type,
         )
-        repo_names.append(repo_name)
+        version_repo_names.append(repo_name)
 
+        # Create repository for mapping
         if target_mapping:
             mapping_info = version_data["downloads"].get("%s_mappings" % target_type)
             if mapping_info == None:
                 fail("No mappings for version %s" % target_version)
 
             # Create mapping repository
-            repo_name = "%s_%s_mapping" % (target_version, target_type)
+            mapping_repo_name = "%s_%s_mapping" % (target_version, target_type)
             http_file(
-                name = "minecraft_%s" % repo_name,
+                name = "minecraft_%s" % mapping_repo_name,
                 url = mapping_info["url"],
                 integrity = hex_sha1_to_sri(mapping_info["sha1"]),
                 downloaded_file_path = "mappings.txt",
             )
-            repo_names.append(repo_name)
+            version_repo_names.append(mapping_repo_name)
 
-    if repo_names:
-        minecraft_registry(
-            name = "minecraft",
-            entries = repo_names,
+        # Append library entries
+        libraries = []
+        for library in version_data["libraries"]:
+            name = library["name"]
+            if library_entries.get(name):
+                continue
+
+            escaped_name = escape_library_name(name)
+            downloads = library["downloads"]["artifact"]
+            library_entries[name] = {
+                "name": escaped_name,
+                "sha1": downloads["sha1"],
+                "url": downloads["url"],
+                "path": downloads["path"],
+            }
+
+            library_repo_name = get_library_repo_name(name)
+            libraries.append('"@%s//file"' % library_repo_name)
+
+        version_libraries[repo_name] = ",\n        ".join(libraries)
+
+    # Create repositories for libraries
+    for library_entry_name in library_entries.keys():
+        library_entry = library_entries[library_entry_name]
+        repo_name = get_library_repo_name(library_entry["name"])
+        http_file(
+            name = repo_name,
+            url = library_entry["url"],
+            integrity = hex_sha1_to_sri(library_entry["sha1"]),
+            downloaded_file_path = library_entry["path"],
         )
+
+    minecraft_registry(
+        name = "minecraft",
+        version_repo_names = version_repo_names,
+        version_libraries = version_libraries,
+    )
 
 minecraft = module_extension(
     implementation = _minecraft_impl,

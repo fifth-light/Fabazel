@@ -60,6 +60,7 @@ kt_jvm_library(
     deps = [
         ":remapped_client",
         "@maven//:net_fabricmc_fabric_loader",
+        "@minecraft//:1.21.4_client_libraries",
     ],
 )
 

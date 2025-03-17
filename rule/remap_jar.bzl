@@ -1,4 +1,5 @@
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
+load("@rules_java//java/common/rules/impl:basic_java_library_impl.bzl", "collect_deps")
 
 def _remap_jar_impl(ctx):
     input_java_info = ctx.attr.input[JavaInfo]
