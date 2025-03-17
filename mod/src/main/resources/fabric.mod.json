@@ -5,10 +5,15 @@
     "name": "Fabazel",
     "entrypoints": {
         "client": [
-            "top.fifthlight.fabazel.Fabazel"
+            {
+                "adapter": "kotlin",
+                "value": "top.fifthlight.fabazel.Fabazel"
+            }
         ]
     },
     "depends": {
-        "fabricloader": ">=0.16.10"
+        "minecraft": "=1.21.5-beta.2",
+        "fabricloader": ">=0.16.10",
+        "fabric-language-kotlin": ">=1.13.1+kotlin.2.1.10"
     }
 }

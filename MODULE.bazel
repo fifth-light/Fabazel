@@ -23,10 +23,15 @@ maven.install(
 maven.install(
     artifacts = [
         "net.fabricmc:fabric-loader:0.16.10",
-        "net.fabricmc:intermediary:1.21.4:v2",
-        "net.fabricmc:yarn:1.21.4+build.8:v2",
+        "net.fabricmc:intermediary:1.21.5-pre2:v2",
+        "net.fabricmc:yarn:1.21.5-pre2+build.6:v2",
         "net.fabricmc:tiny-remapper:0.11.0",
         "net.fabricmc:mapping-io:0.7.1",
+        "net.fabricmc.fabric-api:fabric-api:0.119.0+1.21.5",
+        "net.fabricmc:fabric-language-kotlin:1.13.1+kotlin.2.1.10",
+    ],
+    excluded_artifacts = [
+        "net.fabricmc.fabric-api:fabric-api-deprecated",
     ],
     repositories = [
         "https://maven.fabricmc.net/",
@@ -38,7 +43,7 @@ use_repo(maven, "maven")
 
 minecraft = use_extension("//repo:minecraft_jar.bzl", "minecraft")
 minecraft.minecraft_jar(
-    version = "1.21.4",
+    version = "1.21.5-pre2",
     type = "client",
     mapping = True,
 )
