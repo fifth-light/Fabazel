@@ -5,6 +5,8 @@ import net.fabricmc.tinyremapper.NonClassCopyMode
 import net.fabricmc.tinyremapper.OutputConsumerPath
 import net.fabricmc.tinyremapper.TinyRemapper
 import net.fabricmc.tinyremapper.extension.mixin.MixinExtension
+import java.io.PrintWriter
+import java.io.StringWriter
 import kotlin.io.path.Path
 
 object TinyRemapperWorker {
@@ -35,6 +37,8 @@ object TinyRemapperWorker {
     private fun handleRequest(request: WorkRequest): WorkResponse {
         val inputs = request.inputs.associate { Pair(it.path, it) }
         fun getInputFileHash(file: String): String = inputs[file]?.digest ?: error("Bad input file: $file")
+        val logBuffer = StringWriter()
+        val logWriter = PrintWriter(logBuffer)
         try {
             val (parameters, arguments) = request.arguments.partition { it.startsWith("--") }
 
@@ -64,8 +68,11 @@ object TinyRemapperWorker {
                 toNamespace = toNamespace,
             )
             val mapping = mappings[mappingArgument]
+
+            val logger = PrintLogger(logWriter)
+
             val remapper = TinyRemapper
-                .newRemapper()
+                .newRemapper(logger)
                 .apply {
                     withMappings(mapping)
                     if (mixin) {
@@ -73,6 +80,7 @@ object TinyRemapperWorker {
                     }
                 }
                 .build()
+
             val input = Path(inputJar)
             try {
                 OutputConsumerPath.Builder(Path(outputJar)).build().use { output ->
@@ -86,13 +94,15 @@ object TinyRemapperWorker {
             }
             return WorkResponse(
                 requestId = request.requestId,
+                output = logBuffer.toString(),
                 exitCode = 0,
             )
         } catch (ex: Exception) {
+            ex.printStackTrace(logWriter)
             return WorkResponse(
                 requestId = request.requestId,
                 exitCode = 1,
-                output = ex.stackTraceToString(),
+                output = logBuffer.toString(),
             )
         }
     }

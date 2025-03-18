@@ -45,25 +45,34 @@ merge_mapping(
 )
 
 remap_jar(
-    name = "remapped_client",
+    name = "remapped_client_named",
     from_namespace = "official",
     inputs = ["@minecraft//:1.21.5-pre2_client"],
     mapping = ":merged_mapping",
     to_namespace = "named",
 )
 
-# TODO: it seems like dependencies are not remapped well
+remap_jar(
+    name = "remapped_client_intermediary",
+    from_namespace = "official",
+    inputs = ["@minecraft//:1.21.5-pre2_client"],
+    mapping = ":intermediary_mapping",
+    to_namespace = "intermediary",
+)
+
 remap_jar(
     name = "remapped_deps",
     classpath = [
-        ":remapped_client",
+        ":remapped_client_intermediary",
     ],
     from_namespace = "intermediary",
     inputs = [
         "@maven//:net_fabricmc_fabric_api_fabric_api",
         "@maven//:net_fabricmc_fabric_language_kotlin",
+        "@maven//:net_fabricmc_fabric_loader",
+        "@maven//:net_fabricmc_sponge_mixin",
     ],
-    mapping = ":merged_mapping",
+    mapping = ":yarn_mapping",
     remap_transitive_deps = True,
     to_namespace = "named",
 )
@@ -77,10 +86,8 @@ kt_jvm_library(
     resources = glob(["src/main/resources/**"]),
     visibility = ["//visibility:public"],
     deps = [
-        ":remapped_client",
+        ":remapped_client_named",
         ":remapped_deps",
-        "@maven//:net_fabricmc_fabric_loader",
-        "@maven//:net_fabricmc_sponge_mixin",
         "@minecraft//:1.21.5-pre2_client_libraries",
     ],
 )
@@ -88,13 +95,13 @@ kt_jvm_library(
 remap_jar(
     name = "mod",
     classpath = [
-        ":remapped_client",
+        ":remapped_client_named",
         "@maven//:net_fabricmc_fabric_api_fabric_api",
         "@maven//:net_fabricmc_fabric_language_kotlin",
     ],
     from_namespace = "named",
     inputs = [":mod_unmapped"],
-    mapping = ":merged_mapping",
+    mapping = ":yarn_mapping",
     mixin = True,
     to_namespace = "intermediary",
 )
