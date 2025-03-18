@@ -16,6 +16,7 @@ object Fabazel : ClientModInitializer {
         logger.info("Hello, Bazel!")
         logger.info("Item dirt's name is: {}", Items.DIRT.name)
         logger.info("Detected version: {}", MinecraftVersion.create().name)
+        FabazelJava.hello()
         PlayerBlockBreakEvents.AFTER.register { world, player, pos, blockState, blockEntity ->
             player.sendMessage(Text.literal("Wow, you have broken one block!"), false)
         }

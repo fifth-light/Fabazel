@@ -61,10 +61,16 @@ def _remap_jar_impl(ctx):
             transitive = [classpath],
         )
 
+        args.use_param_file("@%s", use_always = True)
+
         ctx.actions.run(
             inputs = inputs,
             outputs = [output_jar],
             executable = ctx.executable._tiny_remapper_bin,
+            execution_requirements = {
+                "supports-workers": "1",
+                "requires-worker-protocol": "json",
+            },
             arguments = [args],
             progress_message = "Remapping %s - %s" % (ctx.label.name, input_jar.basename),
         )
@@ -117,7 +123,7 @@ remap_jar = rule(
             doc = "Handle mixin mappings",
         ),
         "_tiny_remapper_bin": attr.label(
-            default = Label("//rule/tiny_remapper"),
+            default = Label("//rule/tiny_remapper_worker"),
             executable = True,
             cfg = "exec",
         ),

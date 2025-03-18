@@ -12,6 +12,7 @@ bazel_dep(name = "rules_jvm_external", version = "6.7")
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
     artifacts = [
+        "org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.0",
         "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0",
         "org.jetbrains:annotations:26.0.2",
         "net.fabricmc:fabric-loader:0.16.10",

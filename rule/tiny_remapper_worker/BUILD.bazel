@@ -1,0 +1,39 @@
+load("@rules_java//java:defs.bzl", "java_binary")
+load("@rules_kotlin//kotlin:core.bzl", "kt_compiler_plugin")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+
+kt_compiler_plugin(
+    name = "serialization_plugin",
+    compile_phase = True,
+    id = "org.jetbrains.kotlin.serialization",
+    stubs_phase = True,
+    deps = [
+        "@rules_kotlin//kotlin/compiler:kotlinx-serialization-compiler-plugin",
+    ],
+)
+
+kt_jvm_library(
+    name = "kotlin_serialization",
+    srcs = [],
+    exported_compiler_plugins = [":serialization_plugin"],
+    exports = [
+        "@maven//:org_jetbrains_kotlinx_kotlinx_serialization_core_jvm",
+    ],
+)
+
+kt_jvm_library(
+    name = "tiny_remapper_worker_library",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    deps = [
+        ":kotlin_serialization",
+        "@maven//:net_fabricmc_tiny_remapper",
+        "@maven//:org_jetbrains_kotlinx_kotlinx_serialization_json_jvm",
+    ],
+)
+
+java_binary(
+    name = "tiny_remapper_worker",
+    main_class = "top.fifthlight.fabazel.remapper.TinyRemapperWorker",
+    visibility = ["//visibility:public"],
+    runtime_deps = [":tiny_remapper_worker_library"],
+)

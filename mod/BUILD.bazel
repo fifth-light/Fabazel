@@ -1,4 +1,3 @@
-load("@maven//:defs.bzl", "maven_artifacts")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("//rule:extract_jar.bzl", "extract_jar")
 load("//rule:merge_mapping.bzl", "merge_mapping", "merge_mapping_input")
@@ -71,8 +70,11 @@ remap_jar(
 
 kt_jvm_library(
     name = "mod_unmapped",
-    srcs = glob(["kotlin/**/*.kt"]),
-    resources = glob(["resources/**"]),
+    srcs = glob([
+        "src/main/kotlin/**/*.kt",
+        "src/main/java/**/*.java",
+    ]),
+    resources = glob(["src/main/resources/**"]),
     visibility = ["//visibility:public"],
     deps = [
         ":remapped_client",

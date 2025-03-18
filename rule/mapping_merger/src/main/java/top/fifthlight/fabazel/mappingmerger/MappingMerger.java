@@ -1,3 +1,5 @@
+package top.fifthlight.fabazel.mappingmerger;
+
 import net.fabricmc.mappingio.MappingVisitor;
 import net.fabricmc.mappingio.adapter.MappingNsCompleter;
 import net.fabricmc.mappingio.adapter.MappingNsRenamer;
@@ -19,7 +21,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@SuppressWarnings("WrongPackageStatement")
 public class MappingMerger {
     private enum MappingFormat {
         TINY_FILE("tiny"),
