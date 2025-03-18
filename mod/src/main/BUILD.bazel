@@ -1,3 +1,4 @@
+load("@maven//:defs.bzl", "maven_artifacts")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("//rule:extract_jar.bzl", "extract_jar")
 load("//rule:merge_mapping.bzl", "merge_mapping", "merge_mapping_input")
@@ -47,8 +48,24 @@ merge_mapping(
 remap_jar(
     name = "remapped_client",
     from_namespace = "official",
-    input = "@minecraft//:1.21.5-pre2_client",
+    inputs = ["@minecraft//:1.21.5-pre2_client"],
     mapping = ":merged_mapping",
+    to_namespace = "named",
+)
+
+# TODO: it seems like dependencies are not remapped well
+remap_jar(
+    name = "remapped_deps",
+    classpath = [
+        ":remapped_client",
+    ],
+    from_namespace = "intermediary",
+    inputs = [
+        "@maven//:net_fabricmc_fabric_api_fabric_api",
+        "@maven//:net_fabricmc_fabric_language_kotlin",
+    ],
+    mapping = ":merged_mapping",
+    remap_transitive_deps = True,
     to_namespace = "named",
 )
 
@@ -59,9 +76,7 @@ kt_jvm_library(
     visibility = ["//visibility:public"],
     deps = [
         ":remapped_client",
-        # TODO: Should remap these mods before depending on them
-        "@maven//:net_fabricmc_fabric_api_fabric_api",
-        "@maven//:net_fabricmc_fabric_language_kotlin",
+        ":remapped_deps",
         "@maven//:net_fabricmc_fabric_loader",
         "@minecraft//:1.21.5-pre2_client_libraries",
     ],
@@ -69,8 +84,13 @@ kt_jvm_library(
 
 remap_jar(
     name = "mod",
+    classpath = [
+        ":remapped_client",
+        "@maven//:net_fabricmc_fabric_api_fabric_api",
+        "@maven//:net_fabricmc_fabric_language_kotlin",
+    ],
     from_namespace = "named",
-    input = ":mod_unmapped",
+    inputs = [":mod_unmapped"],
     mapping = ":merged_mapping",
     mixin = True,
     to_namespace = "intermediary",

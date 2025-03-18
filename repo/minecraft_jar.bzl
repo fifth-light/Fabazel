@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file", "http_jar")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 load("//private:bytes_util.bzl", "hex_sha1_to_sri")
 
 minecraft_jar = tag_class(
@@ -22,7 +22,11 @@ def _minecraft_repo_impl(rctx):
     version_repo_names = rctx.attr.version_repo_names
     version_libraries = rctx.attr.version_libraries
 
-    content = ['package(default_visibility = ["//visibility:public"])', ""]
+    content = [
+        'load("@rules_java//java:defs.bzl", "java_import")',
+        'package(default_visibility = ["//visibility:public"])',
+        "",
+    ]
 
     for version_repo in version_repo_names:
         actual_repo = "@minecraft_%s//file" % version_repo
