@@ -18,7 +18,7 @@ object Fabazel : ClientModInitializer {
         logger.info("Detected version: {}", MinecraftVersion.create().name)
         FabazelJava.hello()
         PlayerBlockBreakEvents.AFTER.register { world, player, pos, blockState, blockEntity ->
-            player.sendMessage(Text.literal("Wow, you have broken one block!"), false)
+            player.sendMessage(Text.literal("Wow, you have broken a block!"), false)
         }
         ClientLifecycleEvents.CLIENT_STARTED.register {
             logger.info("Client loaded! GLFW Platform: ${GLFW.glfwGetPlatform()}")

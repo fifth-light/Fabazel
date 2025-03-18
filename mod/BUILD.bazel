@@ -80,6 +80,7 @@ kt_jvm_library(
         ":remapped_client",
         ":remapped_deps",
         "@maven//:net_fabricmc_fabric_loader",
+        "@maven//:net_fabricmc_sponge_mixin",
         "@minecraft//:1.21.5-pre2_client_libraries",
     ],
 )
