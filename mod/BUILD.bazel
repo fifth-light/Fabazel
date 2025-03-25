@@ -7,14 +7,14 @@ extract_jar(
     name = "intermediary_mapping",
     entry_path = "mappings/mappings.tiny",
     filename = "intermediary.tiny",
-    input = "@maven//:net_fabricmc_intermediary_v2_1_21_5_pre2",
+    input = "@maven//:net_fabricmc_intermediary_v2_1_21_5_rc2",
 )
 
 extract_jar(
     name = "yarn_mapping",
     entry_path = "mappings/mappings.tiny",
     filename = "yarn.tiny",
-    input = "@maven//:net_fabricmc_yarn_v2_1_21_5_pre2_build_6",
+    input = "@maven//:net_fabricmc_yarn_v2_1_21_5_rc2_build_1",
 )
 
 merge_mapping_input(
@@ -47,7 +47,7 @@ merge_mapping(
 remap_jar(
     name = "remapped_client_named",
     from_namespace = "official",
-    inputs = ["@minecraft//:1.21.5-pre2_client"],
+    inputs = ["@minecraft//:1.21.5-rc2_client"],
     mapping = ":merged_mapping",
     to_namespace = "named",
 )
@@ -55,7 +55,7 @@ remap_jar(
 remap_jar(
     name = "remapped_client_intermediary",
     from_namespace = "official",
-    inputs = ["@minecraft//:1.21.5-pre2_client"],
+    inputs = ["@minecraft//:1.21.5-rc2_client"],
     mapping = ":intermediary_mapping",
     to_namespace = "intermediary",
 )
@@ -88,7 +88,7 @@ kt_jvm_library(
     deps = [
         ":remapped_client_named",
         ":remapped_deps",
-        "@minecraft//:1.21.5-pre2_client_libraries",
+        "@minecraft//:1.21.5-rc2_client_libraries",
     ],
 )
 
