@@ -2,19 +2,22 @@ load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("//rule:extract_jar.bzl", "extract_jar")
 load("//rule:merge_mapping.bzl", "merge_mapping", "merge_mapping_input")
 load("//rule:remap_jar.bzl", "remap_jar")
+load("//rule:generate_remap_classpath.bzl", "generate_remap_classpath")
+load("//rule:extract_access_widener.bzl", "extract_access_widener")
+load("//rule:apply_access_widener.bzl", "apply_access_widener")
 
 extract_jar(
     name = "intermediary_mapping",
     entry_path = "mappings/mappings.tiny",
     filename = "intermediary.tiny",
-    input = "@maven//:net_fabricmc_intermediary_v2_1_21_5_rc2",
+    input = "@maven//:net_fabricmc_intermediary_v2_1_21_8",
 )
 
 extract_jar(
     name = "yarn_mapping",
     entry_path = "mappings/mappings.tiny",
     filename = "yarn.tiny",
-    input = "@maven//:net_fabricmc_yarn_v2_1_21_5_rc2_build_1",
+    input = "@maven//:net_fabricmc_yarn_v2_1_21_8_build_1",
 )
 
 merge_mapping_input(
@@ -33,7 +36,7 @@ merge_mapping_input(
 merge_mapping(
     name = "merged_mapping",
     complete_namespace = {
-        "named": "official",
+        "named": "intermediary",
         "intermediary": "official",
     },
     inputs = [
@@ -47,7 +50,7 @@ merge_mapping(
 remap_jar(
     name = "remapped_client_named",
     from_namespace = "official",
-    inputs = ["@minecraft//:1.21.5-rc2_client"],
+    inputs = ["@minecraft//:1.21.8_client"],
     mapping = ":merged_mapping",
     to_namespace = "named",
 )
@@ -55,7 +58,7 @@ remap_jar(
 remap_jar(
     name = "remapped_client_intermediary",
     from_namespace = "official",
-    inputs = ["@minecraft//:1.21.5-rc2_client"],
+    inputs = ["@minecraft//:1.21.8_client"],
     mapping = ":intermediary_mapping",
     to_namespace = "intermediary",
 )
@@ -68,13 +71,25 @@ remap_jar(
     from_namespace = "intermediary",
     inputs = [
         "@maven//:net_fabricmc_fabric_api_fabric_api",
-        "@maven//:net_fabricmc_fabric_language_kotlin",
-        "@maven//:net_fabricmc_fabric_loader",
-        "@maven//:net_fabricmc_sponge_mixin",
     ],
-    mapping = ":yarn_mapping",
+    mapping = ":merged_mapping",
+    mixin = True,
     remap_transitive_deps = True,
+    remove_jar_in_jar = True,
     to_namespace = "named",
+)
+
+extract_access_widener(
+    name = "access_widener_dep_named",
+    inputs = [":remapped_deps"],
+)
+
+apply_access_widener(
+    name = "remapped_client_access_widened_named",
+    srcs = [
+        ":access_widener_dep_named",
+    ],
+    input = ":remapped_client_named",
 )
 
 kt_jvm_library(
@@ -86,22 +101,71 @@ kt_jvm_library(
     resources = glob(["src/main/resources/**"]),
     visibility = ["//visibility:public"],
     deps = [
-        ":remapped_client_named",
+        ":remapped_client_access_widened_named",
         ":remapped_deps",
-        "@minecraft//:1.21.5-rc2_client_libraries",
+        "@maven//:net_fabricmc_fabric_language_kotlin",
+        "@maven//:net_fabricmc_fabric_loader",
+        "@maven//:net_fabricmc_sponge_mixin",
+        "@minecraft//:1.21.8_client_libraries",
     ],
 )
 
 remap_jar(
     name = "mod",
     classpath = [
-        ":remapped_client_named",
+        ":remapped_client_access_widened_named",
         "@maven//:net_fabricmc_fabric_api_fabric_api",
         "@maven//:net_fabricmc_fabric_language_kotlin",
+        "@maven//:net_fabricmc_fabric_loader",
+        "@maven//:net_fabricmc_sponge_mixin",
     ],
     from_namespace = "named",
     inputs = [":mod_unmapped"],
     mapping = ":yarn_mapping",
     mixin = True,
     to_namespace = "intermediary",
+)
+
+generate_remap_classpath(
+    name = "remap_classpath",
+    prefix = "../../../../../../",
+    deps = [
+        ":remapped_deps",
+        ":remapped_client_intermediary",
+    ],
+)
+
+java_binary(
+    name = "client",
+    srcs = [],
+    data = [
+        ":remap_classpath",
+        "@minecraft_assets//:assets_1.21.8",
+    ],
+    env = {
+        "LANG": "en_US.UTF8",
+    },
+    jvm_flags = [
+        "-Dkotlinx.coroutines.debug=on",
+        "-Dfabric.development=true",
+        "-Dfabric.log.disableAnsi=false",
+        "-Dfabric.remapClasspathFile=../../remap_classpath.txt",
+        "-Ddev.launch.version=1.21.8",
+        "-Ddev.launch.type=client",
+        "-Ddev.launch.assetsPath=../+minecraft+minecraft_assets",
+        "-Ddev.launch.mainClass=net.fabricmc.loader.impl.launch.knot.KnotClient",
+        "-Xmx4G",
+    ],
+    main_class = "top.fifthlight.fabazel.devlaunchwrapper.DevLaunchWrapper",
+    runtime_deps = [
+        "//rule/dev_launch_wrapper",
+        "@minecraft//:1.21.8_client_libraries",
+        ":mod_unmapped",
+        ":remapped_deps",
+        ":remapped_client_access_widened_named",
+        "@maven//:net_fabricmc_fabric_language_kotlin",
+        "@maven//:net_fabricmc_fabric_loader",
+        "@maven//:net_fabricmc_sponge_mixin",
+        "@maven//:net_fabricmc_yarn_v2",
+    ],
 )

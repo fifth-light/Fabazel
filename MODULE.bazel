@@ -15,12 +15,14 @@ maven.install(
         "org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.0",
         "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0",
         "org.jetbrains:annotations:26.0.2",
-        "net.fabricmc:fabric-loader:0.16.10",
-        "net.fabricmc:intermediary:1.21.5-rc2:v2",
-        "net.fabricmc:yarn:1.21.5-rc2+build.1:v2",
+        "net.fabricmc:fabric-loader:0.16.13",
+        "net.fabricmc:intermediary:1.21.8:v2",
+        "net.fabricmc:yarn:1.21.8+build.1:v2",
         "net.fabricmc:tiny-remapper:0.11.0",
         "net.fabricmc:mapping-io:0.7.1",
-        "net.fabricmc.fabric-api:fabric-api:0.119.4+1.21.5",
+        "net.fabricmc:mapping-io-extras:0.7.1",
+        "net.fabricmc:access-widener:2.1.0",
+        "net.fabricmc.fabric-api:fabric-api:0.129.0+1.21.8",
         "net.fabricmc:fabric-language-kotlin:1.13.1+kotlin.2.1.10",
         "net.fabricmc:sponge-mixin:0.15.4+mixin.0.8.7",
     ],
@@ -34,8 +36,11 @@ use_repo(maven, "maven")
 
 minecraft = use_extension("//repo:minecraft_jar.bzl", "minecraft")
 minecraft.minecraft_jar(
-    version = "1.21.5-rc2",
+    version = "1.21.8",
     type = "client",
+    assets = True,
     mapping = False,
 )
+minecraft.exclude_library(names = ["org.ow2.asm:asm:9.6"])
 use_repo(minecraft, "minecraft")
+use_repo(minecraft, "minecraft_assets")

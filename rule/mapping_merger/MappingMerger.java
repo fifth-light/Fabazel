@@ -4,6 +4,7 @@ import net.fabricmc.mappingio.MappingVisitor;
 import net.fabricmc.mappingio.adapter.MappingNsCompleter;
 import net.fabricmc.mappingio.adapter.MappingNsRenamer;
 import net.fabricmc.mappingio.adapter.MappingSourceNsSwitch;
+import net.fabricmc.mappingio.adapter.OuterClassNamePropagator;
 import net.fabricmc.mappingio.format.proguard.ProGuardFileReader;
 import net.fabricmc.mappingio.format.tiny.Tiny1FileReader;
 import net.fabricmc.mappingio.format.tiny.Tiny2FileReader;
@@ -48,139 +49,66 @@ public class MappingMerger {
         }
     }
 
-    private static class NamespacePair {
-        @NotNull
-        private final String from;
-        @NotNull
-        private final String to;
-
-        public NamespacePair(@NotNull String from, @NotNull String to) {
-            this.from = from;
-            this.to = to;
-        }
+    private record NamespacePair(@NotNull String from, @NotNull String to) {
 
         public static NamespacePair parse(String mapping) {
-            int index = mapping.indexOf(":");
-            if (index == -1) {
-                throw new IllegalArgumentException("Bad namespace pair: " + mapping);
+            var index = mapping.indexOf(":");
+                if (index == -1) {
+                    throw new IllegalArgumentException("Bad namespace pair: " + mapping);
+                }
+            var from = mapping.substring(0, index);
+            var to = mapping.substring(index + 1);
+                if (from.isEmpty()) {
+                    throw new IllegalArgumentException("Empty from namespace");
+                }
+                if (to.isEmpty()) {
+                    throw new IllegalArgumentException("Empty to namespace");
+                }
+                return new NamespacePair(from, to);
             }
-            String from = mapping.substring(0, index);
-            String to = mapping.substring(index + 1);
-            if (from.isEmpty()) {
-                throw new IllegalArgumentException("Empty from namespace");
+
+        @Override
+            public String toString() {
+                return from + ":" + to;
             }
-            if (to.isEmpty()) {
-                throw new IllegalArgumentException("Empty to namespace");
+        }
+
+    private record InputEntry(@NotNull Path path, @NotNull MappingMerger.MappingFormat format,
+                              @NotNull Map<String, String> namespaceMapping, @Nullable String sourceNamespace) {
+
+        @Override
+            public boolean equals(Object o) {
+                if (o == null || getClass() != o.getClass()) return false;
+            var that = (InputEntry) o;
+                return Objects.equals(path, that.path) && format == that.format && Objects.equals(namespaceMapping, that.namespaceMapping) && Objects.equals(sourceNamespace, that.sourceNamespace);
             }
-            return new NamespacePair(from, to);
-        }
-
-        @NotNull
-        public String getFrom() {
-            return from;
-        }
-
-        @NotNull
-        public String getTo() {
-            return to;
-        }
 
         @Override
-        public boolean equals(Object o) {
-            if (o == null || getClass() != o.getClass()) return false;
-            NamespacePair that = (NamespacePair) o;
-            return Objects.equals(from, that.from) && Objects.equals(to, that.to);
+            public String toString() {
+                return "InputEntry{" +
+                        "path=" + path +
+                        ", format=" + format +
+                        ", namespaceMapping=" + namespaceMapping +
+                        ", sourceNamespace='" + sourceNamespace + '\'' +
+                        '}';
+            }
         }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(from, to);
-        }
-
-        @Override
-        public String toString() {
-            return from + ":" + to;
-        }
-    }
-
-    private static class InputEntry {
-        @NotNull
-        private final Path path;
-        @NotNull
-        private final MappingMerger.MappingFormat format;
-        @NotNull
-        private final Map<String, String> namespaceMapping;
-        @Nullable
-        private final String sourceNamespace;
-
-        public InputEntry(@NotNull Path path,
-                          @NotNull MappingMerger.MappingFormat format,
-                          @NotNull Map<String, String> namespaceMapping,
-                          @Nullable String sourceNamespace) {
-            this.path = path;
-            this.format = format;
-            this.namespaceMapping = namespaceMapping;
-            this.sourceNamespace = sourceNamespace;
-        }
-
-        @NotNull
-        public Path getPath() {
-            return path;
-        }
-
-        @NotNull
-        public MappingFormat getFormat() {
-            return format;
-        }
-
-        @NotNull
-        public Map<String, String> getNamespaceMapping() {
-            return namespaceMapping;
-        }
-
-        @Nullable
-        public String getSourceNamespace() {
-            return sourceNamespace;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (o == null || getClass() != o.getClass()) return false;
-            InputEntry that = (InputEntry) o;
-            return Objects.equals(path, that.path) && format == that.format && Objects.equals(namespaceMapping, that.namespaceMapping) && Objects.equals(sourceNamespace, that.sourceNamespace);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(path, format, namespaceMapping, sourceNamespace);
-        }
-
-        @Override
-        public String toString() {
-            return "InputEntry{" +
-                    "path=" + path +
-                    ", format=" + format +
-                    ", namespaceMapping=" + namespaceMapping +
-                    ", sourceNamespace='" + sourceNamespace + '\'' +
-                    '}';
-        }
-    }
 
     public static void main(String[] args) throws IOException {
         MappingFormat format = null;
-        HashMap<String, String> namespaceMappings = new HashMap<>();
-        HashMap<String, String> completeNamespace = new HashMap<>();
+        var namespaceMappings = new HashMap<String, String>();
+        var completeNamespace = new HashMap<String, String>();
         List<InputEntry> inputEntries = new ArrayList<>();
         Path outputPath = null;
         String sourceNamespace = null;
-        for (int argIndex = 0; argIndex < args.length; argIndex++) {
-            String arg = args[argIndex];
+        for (var argIndex = 0; argIndex < args.length; argIndex++) {
+            var arg = args[argIndex];
             if (arg.startsWith("--")) {
-                String name = arg.substring(2);
+                var name = arg.substring(2);
                 if (argIndex >= args.length - 1) {
                     throw new IllegalArgumentException("No value for argument: " + arg);
                 }
-                String value = args[argIndex + 1];
+                var value = args[argIndex + 1];
                 argIndex++;
                 switch (name) {
                     case "format":
@@ -191,7 +119,7 @@ public class MappingMerger {
                                 .filter(type -> type.name.equals(value))
                                 .findAny()
                                 .orElseThrow(() -> {
-                                    String availableMappingTypes = Arrays.stream(MappingFormat.values())
+                                    var availableMappingTypes = Arrays.stream(MappingFormat.values())
                                             .map(type -> type.name)
                                             .collect(Collectors.joining("\n"));
                                     return new IllegalArgumentException(
@@ -206,18 +134,18 @@ public class MappingMerger {
                         sourceNamespace = value;
                         break;
                     case "complete_namespace":
-                        NamespacePair completePair = NamespacePair.parse(value);
-                        if (completeNamespace.containsKey(completePair.getFrom())) {
+                        var completePair = NamespacePair.parse(value);
+                        if (completeNamespace.containsKey(completePair.from())) {
                             throw new IllegalArgumentException("Complete namespace is already specified: " + completePair);
                         }
-                        completeNamespace.put(completePair.getFrom(), completePair.getTo());
+                        completeNamespace.put(completePair.from(), completePair.to());
                         break;
                     case "namespace-mapping":
-                        NamespacePair namespacePair = NamespacePair.parse(value);
-                        if (namespaceMappings.containsKey(namespacePair.getFrom())) {
+                        var namespacePair = NamespacePair.parse(value);
+                        if (namespaceMappings.containsKey(namespacePair.from())) {
                             throw new IllegalArgumentException("Namespace mapping is already specified: " + namespacePair);
                         }
-                        namespaceMappings.put(namespacePair.getFrom(), namespacePair.getTo());
+                        namespaceMappings.put(namespacePair.from(), namespacePair.to());
                         break;
                     default:
                         throw new IllegalArgumentException("Bad argument: " + name);
@@ -228,7 +156,7 @@ public class MappingMerger {
                 if (format == null) {
                     throw new IllegalArgumentException("No format specified for mapping: " + arg);
                 }
-                Path path = Path.of(arg);
+                var path = Path.of(arg);
                 inputEntries.add(new InputEntry(path,
                         format,
                         Collections.unmodifiableMap(namespaceMappings),
@@ -244,29 +172,30 @@ public class MappingMerger {
             return;
         }
 
-        MemoryMappingTree destinationTree = new MemoryMappingTree();
-        for (InputEntry entry : inputEntries) {
-            MappingVisitor visitor = getMappingVisitor(entry, destinationTree);
-            try (BufferedReader reader = Files.newBufferedReader(entry.getPath())) {
-                entry.getFormat().read(reader, visitor);
+        var destinationTree = new MemoryMappingTree();
+        for (var entry : inputEntries) {
+            var visitor = getMappingVisitor(entry, destinationTree);
+            try (var reader = Files.newBufferedReader(entry.path())) {
+                entry.format().read(reader, visitor);
             }
         }
-        try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
+        try (var writer = Files.newBufferedWriter(outputPath)) {
             MappingVisitor visitor = new Tiny2FileWriter(writer, false);
             if (!completeNamespace.isEmpty()) {
                 visitor = new MappingNsCompleter(visitor, completeNamespace);
             }
+            visitor = new OuterClassNamePropagator(visitor);
             destinationTree.accept(visitor);
         }
     }
 
     private static MappingVisitor getMappingVisitor(InputEntry entry, MemoryMappingTree destinationTree) {
         MappingVisitor visitor = destinationTree;
-        if (entry.getSourceNamespace() != null) {
-            visitor = new MappingSourceNsSwitch(visitor, entry.getSourceNamespace());
+        if (entry.sourceNamespace() != null) {
+            visitor = new MappingSourceNsSwitch(visitor, entry.sourceNamespace());
         }
-        if (!entry.getNamespaceMapping().isEmpty()) {
-            visitor = new MappingNsRenamer(visitor, entry.getNamespaceMapping());
+        if (!entry.namespaceMapping().isEmpty()) {
+            visitor = new MappingNsRenamer(visitor, entry.namespaceMapping());
         }
         return visitor;
     }

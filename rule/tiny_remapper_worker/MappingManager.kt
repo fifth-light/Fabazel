@@ -1,7 +1,11 @@
 package top.fifthlight.fabazel.remapper
 
+import net.fabricmc.mappingio.MappingReader
+import net.fabricmc.mappingio.extras.MappingTreeRemapper
+import net.fabricmc.mappingio.tree.MemoryMappingTree
 import net.fabricmc.tinyremapper.IMappingProvider
 import net.fabricmc.tinyremapper.TinyUtils
+import org.objectweb.asm.commons.Remapper
 import java.lang.AutoCloseable
 import java.nio.file.Path
 import java.time.Duration
@@ -24,6 +28,7 @@ class MappingManager: AutoCloseable {
 
     data class CacheEntry(
         val provider: IMappingProvider,
+        val remapper: Remapper,
         var lastUsed: Instant
     )
 
@@ -41,10 +46,22 @@ class MappingManager: AutoCloseable {
 
         val key by lazy { Key(mappingHash, fromNamespace, toNamespace) }
 
-        fun getMapping() = TinyUtils.createTinyMappingProvider(mapping, fromNamespace, toNamespace)
+        val mappingTree by lazy {
+            MemoryMappingTree().also { tree ->
+                MappingReader.read(mapping, tree)
+            }
+        }
+
+        val remapper by lazy {
+            MappingTreeRemapper(mappingTree, fromNamespace, toNamespace)
+        }
+
+        val mappingProvider: IMappingProvider by lazy {
+            TinyUtils.createMappingProvider(mappingTree, fromNamespace, toNamespace)
+        }
     }
 
-    operator fun get(argument: Argument): IMappingProvider {
+    operator fun get(argument: Argument): CacheEntry {
         val now = Instant.now()
         val key = argument.key
 
@@ -53,14 +70,15 @@ class MappingManager: AutoCloseable {
                 lastUsed = now
             } ?: run {
                 CacheEntry(
-                    provider = argument.getMapping(),
+                    provider = argument.mappingProvider,
+                    remapper = argument.remapper,
                     lastUsed = now
                 )
             }
         }!!
 
         scheduleCleanupIfNeeded(entry.lastUsed.plusMillis(cleanupTimeout.inWholeMilliseconds))
-        return entry.provider
+        return entry
     }
 
     private fun scheduleCleanupIfNeeded(expiration: Instant) {

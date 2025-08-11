@@ -1,8 +1,0 @@
-load("@rules_java//java:defs.bzl", "java_binary")
-
-java_binary(
-    name = "tiny_remapper",
-    main_class = "net.fabricmc.tinyremapper.Main",
-    visibility = ["//visibility:public"],
-    runtime_deps = ["@maven//:net_fabricmc_tiny_remapper"],
-)

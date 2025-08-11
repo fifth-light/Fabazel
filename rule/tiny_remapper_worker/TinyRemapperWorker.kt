@@ -7,6 +7,7 @@ import net.fabricmc.tinyremapper.TinyRemapper
 import net.fabricmc.tinyremapper.extension.mixin.MixinExtension
 import java.io.PrintWriter
 import java.io.StringWriter
+import java.util.regex.Pattern
 import kotlin.io.path.Path
 
 object TinyRemapperWorker {
@@ -16,6 +17,7 @@ object TinyRemapperWorker {
     }
 
     private val mappings = MappingManager()
+    private val MC_LV_PATTERN = Pattern.compile("\\$\\$\\d+")
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -35,7 +37,7 @@ object TinyRemapperWorker {
     }
 
     private fun handleRequest(request: WorkRequest): WorkResponse {
-        val inputs = request.inputs.associate { Pair(it.path, it) }
+        val inputs = request.inputs.associateBy { it.path }
         fun getInputFileHash(file: String): String = inputs[file]?.digest ?: error("Bad input file: $file")
         val logBuffer = StringWriter()
         val logWriter = PrintWriter(logBuffer)
@@ -43,10 +45,16 @@ object TinyRemapperWorker {
             val (parameters, arguments) = request.arguments.partition { it.startsWith("--") }
 
             var mixin = false
+            var fixPackageAccess = false
+            var remapAccessWidener = false
+            var removeJarInJar = false
             for (parameter in parameters) {
                 val name = parameter.removePrefix("--")
                 when (name) {
                     "mixin" -> mixin = true
+                    "fix_package_access" -> fixPackageAccess = true
+                    "remap_access_widener" -> remapAccessWidener = true
+                    "remove_jar_in_jar" -> removeJarInJar = true
                 }
             }
 
@@ -67,26 +75,51 @@ object TinyRemapperWorker {
                 fromNamespace = fromNamespace,
                 toNamespace = toNamespace,
             )
-            val mapping = mappings[mappingArgument]
+            val entry = mappings[mappingArgument]
 
             val logger = PrintLogger(logWriter)
 
             val remapper = TinyRemapper
                 .newRemapper(logger)
                 .apply {
-                    withMappings(mapping)
+                    withMappings(entry.provider)
                     if (mixin) {
                         extension(MixinExtension())
+                    }
+                    renameInvalidLocals(true)
+                    rebuildSourceFilenames(true)
+                    invalidLvNamePattern(MC_LV_PATTERN)
+                    resolveMissing(true)
+                    inferNameFromSameLvIndex(true)
+                    if (fixPackageAccess) {
+                        fixPackageAccess(true)
+                        checkPackageAccess(true)
                     }
                 }
                 .build()
 
             val input = Path(inputJar)
             try {
-                OutputConsumerPath.Builder(Path(outputJar)).build().use { output ->
-                    output.addNonClassFiles(input, NonClassCopyMode.FIX_META_INF, remapper)
+                OutputConsumerPath.Builder(Path(outputJar))
+                    .assumeArchive(true)
+                    .build()
+                    .use { output ->
+                    val nonClassFilesProcessors = buildList {
+                        if (removeJarInJar) {
+                            add(JarInJarRemover)
+                        }
+                        addAll(NonClassCopyMode.FIX_META_INF.remappers)
+                        if (remapAccessWidener) {
+                            add(AccessWidenerRemapper(
+                                entry.remapper,
+                                fromNamespace,
+                                toNamespace
+                            ))
+                        }
+                    }
+                    output.addNonClassFiles(input, remapper, nonClassFilesProcessors)
                     remapper.readInputs(input)
-                    remapper.readClassPath(*classpath.toTypedArray())
+                    classpath.forEach { remapper.readClassPath(it) }
                     remapper.apply(output)
                 }
             } finally {

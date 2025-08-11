@@ -8,21 +8,20 @@ kt_kotlinc_options(
 )
 
 kt_jvm_library(
-    name = "tiny_remapper_worker_library",
+    name = "access_widener_extractor_library",
     srcs = glob(["*.kt"]),
     kotlinc_opts = "kotlinc_opts",
     deps = [
         "//:kotlin_serialization",
+        "@maven//:net_fabricmc_access_widener",
         "@maven//:net_fabricmc_tiny_remapper",
         "@maven//:org_jetbrains_kotlinx_kotlinx_serialization_json_jvm",
-        "@maven//:net_fabricmc_access_widener",
-        "@maven//:net_fabricmc_mapping_io_extras",
     ],
 )
 
 java_binary(
-    name = "tiny_remapper_worker",
-    main_class = "top.fifthlight.fabazel.remapper.TinyRemapperWorker",
+    name = "access_widener_extractor",
+    main_class = "top.fifthlight.fabazel.accesswidenerextractor.AccessWidenerExtractorKt",
     visibility = ["//visibility:public"],
-    runtime_deps = [":tiny_remapper_worker_library"],
+    runtime_deps = [":access_widener_extractor_library"],
 )

@@ -1,8 +1,6 @@
 load("@rules_java//java:defs.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 
-# TODO: spawn a daemon process to remap JARs
-
 def _remap_jar_impl(ctx):
     output_jars = []
     java_infos = []
@@ -11,37 +9,45 @@ def _remap_jar_impl(ctx):
     classpath_depsets = []
     for item in ctx.attr.classpath:
         if JavaInfo in item:
-            classpath_depsets.append(item[JavaInfo].compile_jars)
+            classpath_depsets.append(item[JavaInfo].full_compile_jars)
         else:
             classpath_depsets.append(item[DefaultInfo].files)
-
-    classpath = depset(transitive = classpath_depsets)
 
     # Collect all input JARs
     input_jar_depsets = []
     for input_target in ctx.attr.inputs:
         input_java_info = input_target[JavaInfo]
+        classpath_depsets.append(input_java_info.transitive_compile_time_jars)
         if ctx.attr.remap_transitive_deps:
-            input_jar_depsets.append(input_java_info.compile_jars)
+            input_jar_depsets.append(input_java_info.full_compile_jars)
             input_jar_depsets.append(input_java_info.transitive_compile_time_jars)
         else:
             input_jar_depsets.append(depset(input_java_info.runtime_output_jars))
 
+    classpath = depset(transitive = classpath_depsets)
+
     input_jars = depset(transitive = input_jar_depsets)
     for input_jar in input_jars.to_list():
+        if len(input_jar.basename) > 8 and input_jar.basename[-8:] == "ijar.jar":
+            continue
+
         if ctx.attr.remap_transitive_deps:
             # Generate unique output name per input
-            output_jar = ctx.actions.declare_file(
-                "remapped_%s_%s.jar" % (ctx.label.name, input_jar.basename),
-            )
+            output_jar = ctx.actions.declare_file("_remapped/%s_%s" % (ctx.label.name, input_jar.basename))
         else:
-            output_jar = ctx.actions.declare_file("%s.jar" % ctx.label.name)
+            output_jar = ctx.actions.declare_file("_remapped/%s.jar" % ctx.label.name)
         output_jars.append(output_jar)
 
         # Generate arguments for Tiny Remapper
         args = ctx.actions.args()
         if ctx.attr.mixin:
             args.add("--mixin")
+        if ctx.attr.fix_package_access:
+            args.add("--fix_package_access")
+        if ctx.attr.remap_access_widener:
+            args.add("--remap_access_widener")
+        if ctx.attr.remove_jar_in_jar:
+            args.add("--remove_jar_in_jar")
 
         args.add_all([
             input_jar.path,
@@ -121,6 +127,18 @@ remap_jar = rule(
         "mixin": attr.bool(
             default = False,
             doc = "Handle mixin mappings",
+        ),
+        "fix_package_access": attr.bool(
+            default = False,
+            doc = "Fix invalid package access",
+        ),
+        "remap_access_widener": attr.bool(
+            default = True,
+            doc = "Remap access wideners",
+        ),
+        "remove_jar_in_jar": attr.bool(
+            default = False,
+            doc = "Remove Jar-IN-Jar for Fabric mods`",
         ),
         "_tiny_remapper_bin": attr.label(
             default = Label("//rule/tiny_remapper_worker"),
