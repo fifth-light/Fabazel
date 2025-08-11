@@ -12,3 +12,7 @@ Minecraft Fabric mod built with Bazel.
 
 1. Install Bazel.
 2. Run `bazel run @//mod:client`.
+
+## License
+
+This project is licensed in Apache 2.0 license. Welcome to use this project as template of your next Fabric mod!
