@@ -31,7 +31,7 @@ public class DevLaunchWrapper {
             }
         }
 
-        var argsList = new ArrayList<String>(Arrays.asList(args));
+        var argsList = new ArrayList<>(Arrays.asList(args));
 
         if (glfwLibName != null) {
             System.setProperty("org.lwjgl.glfw.libname", glfwLibName);
